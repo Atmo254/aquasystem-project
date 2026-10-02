@@ -1,0 +1,66 @@
+import json
+import os
+
+# Load your System Prompt
+PROMPT_PATH = "backend/prompts/ro_diagnostic_prompt.txt"
+
+def build_user_payload(telemetry: dict):
+    return f"""
+TELEMETRY MATRIX:
+- Raw Flow: {telemetry.get('raw_flow')} m3/h
+- Normalized Flow: {telemetry.get('norm_flow')} m3/h
+- Stage1 Delta-P: {telemetry.get('dp1')} bar
+- Stage2 Delta-P: {telemetry.get('dp2')} bar
+- Salt Rejection: {telemetry.get('salt_rej')} %
+- LSI: {telemetry.get('lsi')}
+- Anti-scalant Dosing: {telemetry.get('antiscalant')} ppm
+
+SYSTEM CONFIG:
+- Thresholds: {telemetry.get('thresholds')}
+- Mode: {telemetry.get('mode')}
+"""
+
+def run_diagnostics(telemetry: dict):
+    """
+    This is where you call OpenAI / Muse / Gemini.
+    I will give you the logic that enforces your LAWS before AI call.
+    """
+    lsi = telemetry.get('lsi', 0)
+    dp1 = telemetry.get('dp1', 0)
+    dp2 = telemetry.get('dp2', 0)
+    salt_rej = telemetry.get('salt_rej', 98)
+    norm_flow_drop = telemetry.get('norm_flow_drop', 0) # % drop
+
+    # LAW 1: Scaling vs Biofouling Differentiation Matrix
+    primary_anomaly = "No Anomaly"
+    confidence = "High"
+    justification = ""
+
+    if salt_rej < 97 and dp1 > 2.5 and lsi > 1.2:
+        primary_anomaly = "Calcium Carbonate Scaling risk"
+        justification = f"Salt Rejection {salt_rej}% low, Stage1 DP {dp1} bar rapid rise, LSI {lsi} high = CaCO3 precipitation."
+    elif dp1 > 2.2 and lsi <= 0.5:
+        primary_anomaly = "Biofouling / Organic fouling"
+        justification = f"Stage1 DP {dp1} bar rising but LSI {lsi} stable/negative, indicates biological mass, not mineral."
+    elif dp2 > 2.0 and norm_flow_drop > 10:
+        primary_anomaly = "Silica scaling risk"
+        justification = f"Stage2 DP {dp2} bar dominant rise + Normalized flow drop {norm_flow_drop}% = Silica deposition in tail elements."
+
+    # Now build final prompt for LLM
+    with open(PROMPT_PATH, 'r') as f:
+        system_prompt = f.read()
+
+    user_prompt = build_user_payload(telemetry)
+
+    # TODO: Call your LLM here with system_prompt + user_prompt
+    # Return must follow your Expected Output Structure
+
+    return {
+        "system_prompt": system_prompt,
+        "user_payload": user_prompt,
+        "pre_diagnosis": {
+            "Primary Anomaly": primary_anomaly,
+            "Confidence": confidence,
+            "Justification": justification
+        }
+    }

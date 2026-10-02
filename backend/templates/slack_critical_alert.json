@@ -1,0 +1,31 @@
+{
+  "blocks": [
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "🚨 CRITICAL RO OPERATION ALERT" }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Tenant:* AquaPure Industrial\n*Asset:* RO-UNIT-02B" },
+        { "type": "mrkdwn", "text": "*Trigger Tag:* Media Filter ΔP\n*Current Value:* 1.15 bar" }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        { "type": "mrkdwn", "text": "⚠️ *Threshold Exceeded:* 1.0 bar limit. Automated Backwash queue recommendation generated." }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": { "type": "plain_text", "text": "Open Dashboard Link" },
+          "url": "https://aquapure.io"
+        }
+      ]
+    }
+  ]
+}

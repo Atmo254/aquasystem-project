@@ -1,0 +1,46 @@
+{
+  "tenant_id": "tnt_aquapure_0982",
+  "client_name": "AquaPure Industrial Solutions",
+  "localization": {
+    "units": {
+      "flow": "m3/h",
+      "pressure": "bar",
+      "volume": "m3",
+      "temperature": "C"
+    },
+    "timezone": "Africa/Nairobi"
+  },
+  "hardware_gateway": {
+    "broker_url": "mqtts://broker.hivemq.com:8883",
+    "base_topic": "telemetry/v1/aquapure_0982",
+    "qos": 1
+  },
+  "threshold_matrix": {
+    "feed_pressure": { "min": 2.0, "max": 16.0, "critical_high": 18.0 },
+    "media_filter_delta_p": { "max_warning": 0.8, "critical_backwash": 1.0 },
+    "micron_filter_delta_p": { "max_warning": 1.2, "critical_replace": 1.5 },
+    "stage_1_delta_p": { "baseline": 1.5, "fouling_delta": 0.25 },
+    "stage_2_delta_p": { "baseline": 1.2, "fouling_delta": 0.20 },
+    "storage_tank": { "low_alarm": 20.0, "high_alarm": 95.0 }
+  },
+  "modules_enabled": {
+    "overview_dashboard": true,
+    "live_graphs": true,
+    "lab_water_test": true,
+    "sdi_calculator": true,
+    "ai_analytics_engine": true,
+    "maintenance_scheduler": true
+  },
+  "notification_routing": {
+    "slack": {
+      "enabled": true,
+      "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/HERE",
+      "channels": { "critical": "#ro-alerts-critical", "maintenance": "#ro-maintenance" }
+    },
+    "twilio": {
+      "enabled": true,
+      "sms_recipients": ["+1234567890", "+1987654321"],
+      "alert_on_severity": ["critical"]
+    }
+  }
+}
