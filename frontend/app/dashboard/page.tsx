@@ -5,7 +5,7 @@ export default function Dashboard() {
   const [data, setData] = useState<any>(null)
   useEffect(()=>{
     const fetchData = async ()=>{
-      const res = await fetch('http://192.168.100.120:5000/api/pumps/status')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/...`)
       setData(await res.json())
     }
     fetchData()

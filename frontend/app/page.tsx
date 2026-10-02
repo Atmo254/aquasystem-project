@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 
-const BACKEND = "http://192.168.100.120:5000"
+const BACKEND =process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com"
 
 type Health = {
   status: string
