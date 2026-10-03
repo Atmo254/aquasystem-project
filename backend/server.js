@@ -1,4 +1,10 @@
-const mqtt = require('mqtt')
+const express = require('express');
+const cors = require('cors');
+const mqtt = require('mqtt');
+
+const app = express();
+app.use(cors({ origin: '*' }));
+app.use(express.json());
 
 // MQTT STORE - holds latest live values
 let liveSensors = {
@@ -11,43 +17,34 @@ let liveSensors = {
 
 // Connect to EMQX public broker
 const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883', {
-  clientId: 'aquasystem-naivasha-' + Math.random().toString(16).substr(2,8)
-})
+  clientId: 'aquasystem-naivasha-' + Math.random().toString(16).substring(2,8)
+});
 
 mqttClient.on('connect', () => {
-  console.log('✅ MQTT Connected to broker.emqx.io')
-// Subscribe to all Atmo topics
-  mqttClient.subscribe('atmo/#')
-  mqttClient.subscribe('aquasystem/#')
-})
+  console.log('MQTT Connected to EMQX');
+  mqttClient.subscribe('atmo/#');
+});
 
 mqttClient.on('message', (topic, message) => {
   try {
-    const data = JSON.parse(message.toString())
-    console.log(`MQTT ${topic}:`, data)
-    if(topic === 'atmo/pump1' || topic.includes('pump1')) liveSensors.pump1 = data
-    if(topic === 'atmo/pump2' || topic.includes('pump2')) liveSensors.pump2 = data
-    if(topic.includes('tank')) liveSensors.tankLevel = data.level || data
-    if(topic.includes('cip')) liveSensors.cip = data
-    liveSensors.lastUpdate = new Date().toISOString()
+    const data = JSON.parse(message.toString());
+    // update store based on topic
+    if(topic.includes('pump1')) liveSensors.pump1 = data;
+    if(topic.includes('pump2')) liveSensors.pump2 = data;
+    if(topic.includes('tank')) liveSensors.tankLevel = data.level || data;
+    liveSensors.lastUpdate = new Date().toISOString();
   } catch(e){
-    console.log('Raw MQTT', topic, message.toString())
+    // if not JSON, just store raw
   }
-})
+});
 
-mqttClient.on('error', (e) => console.log('MQTT Error', e))
+// API ROUTES FOR FRONTEND
+app.get('/', (req, res) => res.json({ status: 'ATMO Backend OK', liveSensors }));
+app.get('/api/pumps/status', (req, res) => res.json(liveSensors));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// EXPRESS API
-const express = require('express')
-const cors = require('cors')
-const app = express()
-app.use(cors({ origin: "*" }))
-app.use(express.json())
-
-app.get('/', (req,res) => res.send('AquaSystem Backend Running'))
-app.get('/api/pumps/status', (req,res)=> res.json(liveSensors))
-
-const PORT = process.env.PORT || 5000
+// Use Render port
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Backend Running on http://0.0.0.0:${PORT}`)
-})
+  console.log(`ATMO Backend running on ${PORT}`);
+});
