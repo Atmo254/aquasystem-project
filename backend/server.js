@@ -29,12 +29,17 @@ setInterval(() => {
   }
 }, 5000);
 
-// MQTT still connected for real hardware later
-const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883');
+// MQTT - FIXED for Render (WSS port 8084)
+const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+  clientId: 'atmo-' + Math.random().toString(16).slice(2,8),
+  clean: true,
+  reconnectPeriod: 5000
+});
 mqttClient.on('connect', () => {
-  console.log('MQTT Connected');
+  console.log('MQTT Connected via WSS');
   mqttClient.subscribe('atmo/#');
 });
+mqttClient.on('error', (e) => console.log('MQTT Error:', e.message));
 mqttClient.on('message', (topic, msg) => {
   try{
     const data = JSON.parse(msg.toString());
