@@ -47,7 +47,7 @@ app.use(express.json())
 app.get('/', (req,res) => res.send('AquaSystem Backend Running'))
 app.get('/api/pumps/status', (req,res)=> res.json(liveSensors))
 
-const PORT = 5000
+const PORT = process.env.PORT || 5000
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend Running on http://0.0.0.0:${PORT}`)
 })
