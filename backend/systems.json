@@ -1,0 +1,25 @@
+{
+  "systems": [
+    {
+      "id": "ro5-naivasha",
+      "name": "RO5 Naivasha Main",
+      "roNumber": "069107032F4002485",
+      "mqtt": {
+        "broker": "broker.emqx.io",
+        "port": 1883,
+        "topicRoot": "069107032F4002485/#",
+        "wsUrl": "wss://broker.emqx.io:8084/mqtt"
+      },
+      "widgets": [
+        { "id": "feed", "label": "FEED Flow", "tag": "ROS-FEEDFLOW M3/H", "mqttPath": "ROS/FEEDFLOW", "unit": "m³/h", "type": "big" },
+        { "id": "perm", "label": "PERMEATE Flow", "tag": "ROS-PERMEATEFLOW M3/H", "mqttPath": "ROS/PERMEATEFLOW", "unit": "m³/h", "type": "big" },
+        { "id": "recov", "label": "System Recovery", "tag": "ROS-RECOVERY", "mqttPath": "ROS/RECOVERY", "unit": "%", "type": "small" },
+        { "id": "press", "label": "RO Pressure", "tag": "ROS-ROPRESSURE BAR", "mqttPath": "ROS/ROPRESSURE", "unit": "bar", "type": "small" }
+      ]
+    }
+  ],
+  "users": [
+    { "id": "u1", "username": "admin", "password": "atmo2024!", "role": "superadmin", "systemId": "ro5-naivasha" },
+    { "id": "u2", "username": "naivasha", "password": "client123", "role": "client", "systemId": "ro5-naivasha" }
+  ]
+}
