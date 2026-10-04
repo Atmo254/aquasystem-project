@@ -1,69 +1,97 @@
-"use client"
-import { useEffect, useState } from "react"
-import Link from "next/link"
+I'll give you a clean rewrite — plus the one change that actually fixes the CORS problem from the Next.js side without touching your backend.
 
-// Absolute targeting variable fallback matching your hosting instance configuration
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com"
+### The real fix: proxy through Next.js (kills CORS)
+CORS only bites because the browser calls a *different origin*. Next.js can proxy the request through your own server so the browser sees a same-origin call. Add this to your **`next.config.js`**:
 
-// Explicit type layout definition synchronized to our backend output structures
+```js
+/** @type {import('next').NextConfig} */
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com";
+
+const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: "/api/backend/:path*",
+        destination: `${BACKEND}/:path*`,
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;
+```
+
+Then in your component, fetch from `/api/backend/` instead of the raw backend URL. The browser now makes a same-origin request → **no CORS**. (This only works in a Next.js server environment, not a static export.)
+
+### Rewritten `app/page.tsx` (or `pages/index.tsx`)
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
 type Health = {
-  status: string
-  backend?: string
-  message?: string
-  mqtt?: string
-  device?: string
-  uptime?: string | number
-  lastMqttInteraction?: string
-}
+  status: string;
+  backend?: string;
+  message?: string;
+  mqtt?: string;
+  device?: string;
+  uptime?: string | number;
+  lastMqttInteraction?: string;
+};
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com";
+// Routed through Next.js rewrites so the browser call is same-origin (no CORS).
+const PROXY = "/api/backend/";
 
 export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null)
-  const [backendUp, setBackendUp] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [health, setHealth] = useState<Health | null>(null);
+  const [backendUp, setBackendUp] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        // Querying the root health configuration endpoint exposed by your server configuration
-        const res = await fetch(`${BACKEND}/`, { cache: "no-store" })
-        if (res.ok) {
-          const data = await res.json()
-          setHealth(data)
-          // Evaluate state dynamically; validates status string outputs directly 
-          setBackendUp(data.status === "online")
-        } else {
-          setBackendUp(false)
-        }
+        const res = await fetch(`${PROXY}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: Health = await res.json();
+        setHealth(data);
+        setBackendUp(data.status === "online");
+        setError(null);
       } catch (e) {
-        setBackendUp(false)
+        setBackendUp(false);
+        setError(e instanceof Error ? e.message : "Request failed");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    
-    // Initial fetch validation execution sequence
-    checkBackend()
-    
-    // Continuous monitoring lifecycle configuration loop (every 5 seconds)
-    const interval = setInterval(checkBackend, 5000)
-    return () => clearInterval(interval)
-  }, [])
+    };
+
+    checkBackend();
+    const interval = setInterval(checkBackend, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const card = (border: string) => ({
+    background: "white",
+    padding: "20px",
+    borderRadius: "12px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+    borderLeft: `5px solid ${border}`,
+  });
 
   return (
     <div style={{ minHeight: "100vh", background: "#f0f9ff", fontFamily: "Arial, sans-serif" }}>
-      {/* Top Banner Navigation Header */}
       <div style={{ background: "#0e7490", color: "white", padding: "20px 40px" }}>
         <h1 style={{ margin: 0, fontSize: "28px" }}>AquaSystem - Naivasha</h1>
         <p style={{ margin: "5px 0 0 0", opacity: 0.9 }}>CIP Cleaning & Water Monitoring System</p>
       </div>
 
       <div style={{ padding: "30px", maxWidth: "1100px", margin: "0 auto" }}>
-        
-        {/* Status Reporting Overview Cards Block Grid */}
+        {/* Status cards */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "30px" }}>
-          
-          {/* Main API Infrastructure Monitor Panel */}
-          <div style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", borderLeft: `5px solid ${backendUp ? "#16a34a" : "#dc2626"}` }}>
+          <div style={card(backendUp ? "#16a34a" : "#dc2626")}>
             <h3 style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#666" }}>BACKEND STATUS</h3>
             <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: backendUp ? "#16a34a" : "#dc2626" }}>
               {loading ? "Checking..." : backendUp ? "ONLINE" : "OFFLINE"}
@@ -71,17 +99,15 @@ export default function Home() {
             <p style={{ margin: "5px 0 0 0", fontSize: "11px", color: "#888", overflowX: "auto" }}>{BACKEND}</p>
           </div>
 
-          {/* MQTT Broker Communication Interface Verification */}
-          <div style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", borderLeft: `5px solid ${backendUp && health?.mqtt ? "#16a34a" : "#ba8b02"}` }}>
+          <div style={card(backendUp && health?.mqtt ? "#16a34a" : "#ba8b02")}>
             <h3 style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#666" }}>MQTT BROKER</h3>
             <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: backendUp && health?.mqtt ? "#16a34a" : "#ba8b02" }}>
-              {loading ? "Checking..." : backendUp ? (health?.mqtt || "CONNECTED") : "DISCONNECTED"}
+              {loading ? "Checking..." : backendUp ? health?.mqtt || "CONNECTED" : "DISCONNECTED"}
             </p>
             <p style={{ margin: "5px 0 0 0", fontSize: "12px", color: "#888" }}>Network Connection: WSS Secured</p>
           </div>
 
-          {/* Connected Device Node Details */}
-          <div style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", borderLeft: "5px solid #7c3aed" }}>
+          <div style={card("#7c3aed")}>
             <h3 style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#666" }}>SYSTEM TARGET</h3>
             <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#7c3aed" }}>FRONTEND OK</p>
             <p style={{ margin: "5px 0 0 0", fontSize: "11px", color: "#666", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
@@ -90,36 +116,25 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Action Link Management Panel Section */}
+        {/* Quick navigation */}
         <h2 style={{ marginBottom: "15px" }}>Quick Navigation</h2>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "30px" }}>
-          <Link href="/executive" style={{ textDecoration: "none" }}>
-            <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", cursor: "pointer" }}>
-              <h3 style={{ margin: "0 0 8px 0", color: "#0e7490" }}>Executive Dashboard</h3>
-              <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>View KPIs, OEE, CIP efficiency, water usage reports</p>
-            </div>
-          </Link>
-          <Link href="/dashboard" style={{ textDecoration: "none" }}>
-            <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", cursor: "pointer" }}>
-              <h3 style={{ margin: "0 0 8px 0", color: "#0e7490" }}>Operations Dashboard</h3>
-              <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>Live sensors, alarms, CIP cycles, trends</p>
-            </div>
-          </Link>
-          <Link href="/trends" style={{ textDecoration: "none" }}>
-            <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", cursor: "pointer" }}>
-              <h3 style={{ margin: "0 0 8px 0", color: "#0e7490" }}>Trends & History</h3>
-              <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>Historical data, charts, export</p>
-            </div>
-          </Link>
-          <Link href="/login" style={{ textDecoration: "none" }}>
-            <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", cursor: "pointer" }}>
-              <h3 style={{ margin: "0 0 8px 0", color: "#0e7490" }}>Login / Settings</h3>
-              <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>User management, system configuration</p>
-            </div>
-          </Link>
+          {[
+            { href: "/executive", title: "Executive Dashboard", desc: "View KPIs, OEE, CIP efficiency, water usage reports" },
+            { href: "/dashboard", title: "Operations Dashboard", desc: "Live sensors, alarms, CIP cycles, trends" },
+            { href: "/trends", title: "Trends & History", desc: "Historical data, charts, export" },
+            { href: "/login", title: "Login / Settings", desc: "User management, system configuration" },
+          ].map((item) => (
+            <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
+              <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", cursor: "pointer" }}>
+                <h3 style={{ margin: "0 0 8px 0", color: "#0e7490" }}>{item.title}</h3>
+                <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>{item.desc}</p>
+              </div>
+            </Link>
+          ))}
         </div>
 
-        {/* Live Payload Data Terminal Inspector Window */}
+        {/* Payload */}
         <div style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
           <h3 style={{ marginTop: 0 }}>Backend Response Payload</h3>
           <pre style={{ background: "#f8fafc", padding: "15px", borderRadius: "8px", overflow: "auto", fontSize: "13px", border: "1px solid #e2e8f0" }}>
@@ -127,11 +142,18 @@ export default function Home() {
           </pre>
           {!backendUp && (
             <p style={{ color: "#dc2626", fontSize: "14px", marginTop: "10px", fontWeight: "500" }}>
-              Tip: If deployed on Render free tier, server spin up can require up to 60 seconds after periods of inactivity.
+              {error ? `Error: ${error}` : "Tip: If deployed on Render free tier, server spin up can require up to 60 seconds after periods of inactivity."}
             </p>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
+```
+
+### Two things to know
+1. **The proxy is the fix.** With `next.config.js` rewrites in place, the browser calls `/api/backend/` (same origin) and Next.js forwards it to your Render backend server-side — so CORS never applies. Deploy this and the card should flip to **ONLINE**.
+2. **Alternative if you can't use the proxy** (e.g. static export / no Next server): you must add CORS headers on the backend instead — `app.use(cors({ origin: true }))` in Express. The frontend rewrite alone can't bypass CORS; that's a browser security rule, not a code bug.
+
+If you'd rather run this on Base44 instead of Next.js, tell me and I'll port it to React + Vite with `react-router-dom`.
