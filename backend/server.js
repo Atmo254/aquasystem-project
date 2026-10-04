@@ -4,16 +4,27 @@ const mqtt = require('mqtt');
 
 const app = express();
 
-// 1. Production-Ready CORS configuration
-// Allows requests from both your live Vercel frontend and local environments
+// 1. CORS: allow your real Vercel domain, any *.vercel.app preview, and local dev
+const ALLOWED_ORIGINS = [
+  'https://aquasystem-project.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+const VERCEL_PATTERN = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+
 app.use(cors({
-  origin: ['https://vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-  methods: ['GET', 'POST'],
-  credentials: true
+  origin: (origin, callback) => {
+    // No origin = curl / server-to-server / direct browser visit
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || VERCEL_PATTERN.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false); // blocked: no CORS headers sent
+  },
+  methods: ['GET', 'POST', 'OPTIONS']
 }));
 app.use(express.json());
 
-// Live sensor data structure
+// 2. Live sensor data
 let liveSensors = {
   pump1: { status: 'OFF', pressure: 0, flow: 0 },
   pump2: { status: 'OFF', pressure: 0, flow: 0 },
@@ -22,7 +33,7 @@ let liveSensors = {
   lastUpdate: new Date().toISOString()
 };
 
-// Fallback simulator: Updates mock data if no real MQTT traffic arrives for 10 seconds
+// Fallback simulator: mock data if no real MQTT traffic for 10s
 let lastMqttMessage = Date.now();
 setInterval(() => {
   if (Date.now() - lastMqttMessage > 10000 && liveSensors.pump1.status === 'OFF') {
@@ -36,7 +47,7 @@ setInterval(() => {
   }
 }, 5000);
 
-// 2. Secured MQTT Setup for Cloud Environments (WSS via Port 8084)
+// 3. MQTT over secure WebSocket
 const DEVICE_TOPIC = '069107032F4002485/#';
 const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
   clientId: 'atmo-' + Math.random().toString(16).slice(2, 8),
@@ -48,14 +59,12 @@ const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
 mqttClient.on('connect', () => {
   console.log('MQTT Connected via WSS');
   mqttClient.subscribe(['atmo/#', DEVICE_TOPIC], (err) => {
-    if (!err) {
-      console.log(`Successfully subscribed to atmo/# and ${DEVICE_TOPIC}`);
-    }
+    if (!err) console.log(`Subscribed to atmo/# and ${DEVICE_TOPIC}`);
   });
 });
 
 mqttClient.on('error', (e) => console.log('MQTT Error:', e.message));
-mqttClient.on('offline', () => console.log('MQTT Offline - retrying connection'));
+mqttClient.on('offline', () => console.log('MQTT Offline - retrying'));
 mqttClient.on('reconnect', () => console.log('MQTT Reconnecting...'));
 
 mqttClient.on('message', (topic, msg) => {
@@ -63,16 +72,14 @@ mqttClient.on('message', (topic, msg) => {
     const rawString = msg.toString();
     console.log(`MQTT Received [${topic}]:`, rawString);
     lastMqttMessage = Date.now();
-    
+
     let data;
     try {
       data = JSON.parse(rawString);
     } catch {
-      // Safe fallback wrapper if device posts unformatted raw metrics
       data = { status: 'Running', pressure: 8.5, flow: 350, raw: rawString };
     }
 
-    // Route inbound data properties cleanly to state object
     if (topic.includes('069107032F4002485') || topic.includes('pump1')) {
       liveSensors.pump1 = data;
     }
@@ -80,46 +87,44 @@ mqttClient.on('message', (topic, msg) => {
       liveSensors.pump2 = data;
     }
     if (topic.includes('tank')) {
-      liveSensors.tankLevel = data.level !== undefined ? data.level : (data.value !== undefined ? data.value : data);
+      liveSensors.tankLevel =
+        data.level !== undefined ? data.level :
+        data.value !== undefined ? data.value : data;
     }
     if (topic.includes('cip')) {
       liveSensors.cip = data;
     }
     liveSensors.lastUpdate = new Date().toISOString();
   } catch (e) {
-    console.log('MQTT Message handling error:', e.message);
+    console.log('MQTT message handling error:', e.message);
   }
 });
 
-// 3. API Routing Configuration
-// FIXED ROOT: Sends explicit 'online' status directly on the root path for Vercel's checker
+// 4. Routes
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'online', 
+  res.json({
+    status: 'online',
     backend: 'OK',
-    message: 'ATMO Backend Operating normally', 
-    mqtt: 'WSS Connected', 
-    device: DEVICE_TOPIC 
+    message: 'ATMO Backend Operating normally',
+    mqtt: mqttClient.connected ? 'WSS Connected' : 'WSS Disconnected',
+    device: DEVICE_TOPIC
   });
 });
 
-// Dashboard metrics data query line
 app.get('/api/pumps/status', (req, res) => {
   res.json(liveSensors);
 });
 
-// Secondary health inspection endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'online', 
-    uptime: Math.floor(process.uptime()) + 's', 
-    lastMqttInteraction: new Date(lastMqttMessage).toISOString() 
+  res.json({
+    status: 'online',
+    uptime: Math.floor(process.uptime()) + 's',
+    lastMqttInteraction: new Date(lastMqttMessage).toISOString()
   });
 });
 
-// 4. Bind Server Instance to Network Interfaces
-// Render uses dynamic ports (assigned via process.env.PORT); defaults to 10000 on local execution
+// 5. Start server (Render provides PORT)
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`ATMO Industrial Backend safely hosted on port ${PORT}`);
+  console.log(`ATMO Industrial Backend hosted on port ${PORT}`);
 });
