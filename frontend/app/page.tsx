@@ -1,146 +1,58 @@
-/** @type {import('next').NextConfig} */
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com";
-
-const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: "/api/backend/:path*",
-        destination: `${BACKEND}/:path*`,
-      },
-    ];
-  },
-};
-
-module.exports = nextConfig;
-```
-
-Then in your component, fetch from `/api/backend/` instead of the raw backend URL. The browser now makes a same-origin request → **no CORS**. (This only works in a Next.js server environment, not a static export.)
-
-### Rewritten `app/page.tsx` (or `pages/index.tsx`)
-
-```tsx
 "use client";
-
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
-type Health = {
-  status: string;
-  backend?: string;
-  message?: string;
-  mqtt?: string;
-  device?: string;
-  uptime?: string | number;
-  lastMqttInteraction?: string;
-};
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com";
-// Routed through Next.js rewrites so the browser call is same-origin (no CORS).
-const PROXY = "/api/backend/";
+const BACKEND_URL = "https://atmo-backend-212u.onrender.com";
 
 export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [backendUp, setBackendUp] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
+  const [status, setStatus] = useState("CONNECTING");
 
   useEffect(() => {
-    const checkBackend = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(`${PROXY}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: Health = await res.json();
-        setHealth(data);
-        setBackendUp(data.status === "online");
-        setError(null);
+        const res = await fetch(`${BACKEND_URL}/api/pumps/status`);
+        const json = await res.json();
+        setData(json);
+        setStatus("ONLINE");
       } catch (e) {
-        setBackendUp(false);
-        setError(e instanceof Error ? e.message : "Request failed");
-      } finally {
-        setLoading(false);
+        setStatus("OFFLINE");
+        setData({ error: "Backend waking up, retrying..." });
       }
     };
-
-    checkBackend();
-    const interval = setInterval(checkBackend, 5000);
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const card = (border: string) => ({
-    background: "white",
-    padding: "20px",
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-    borderLeft: `5px solid ${border}`,
-  });
-
   return (
-    <div style={{ minHeight: "100vh", background: "#f0f9ff", fontFamily: "Arial, sans-serif" }}>
-      <div style={{ background: "#0e7490", color: "white", padding: "20px 40px" }}>
-        <h1 style={{ margin: 0, fontSize: "28px" }}>AquaSystem - Naivasha</h1>
-        <p style={{ margin: "5px 0 0 0", opacity: 0.9 }}>CIP Cleaning & Water Monitoring System</p>
-      </div>
-
-      <div style={{ padding: "30px", maxWidth: "1100px", margin: "0 auto" }}>
-        {/* Status cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "30px" }}>
-          <div style={card(backendUp ? "#16a34a" : "#dc2626")}>
-            <h3 style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#666" }}>BACKEND STATUS</h3>
-            <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: backendUp ? "#16a34a" : "#dc2626" }}>
-              {loading ? "Checking..." : backendUp ? "ONLINE" : "OFFLINE"}
-            </p>
-            <p style={{ margin: "5px 0 0 0", fontSize: "11px", color: "#888", overflowX: "auto" }}>{BACKEND}</p>
-          </div>
-
-          <div style={card(backendUp && health?.mqtt ? "#16a34a" : "#ba8b02")}>
-            <h3 style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#666" }}>MQTT BROKER</h3>
-            <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: backendUp && health?.mqtt ? "#16a34a" : "#ba8b02" }}>
-              {loading ? "Checking..." : backendUp ? health?.mqtt || "CONNECTED" : "DISCONNECTED"}
-            </p>
-            <p style={{ margin: "5px 0 0 0", fontSize: "12px", color: "#888" }}>Network Connection: WSS Secured</p>
-          </div>
-
-          <div style={card("#7c3aed")}>
-            <h3 style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#666" }}>SYSTEM TARGET</h3>
-            <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#7c3aed" }}>FRONTEND OK</p>
-            <p style={{ margin: "5px 0 0 0", fontSize: "11px", color: "#666", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-              Topic: {health?.device || "Checking..."}
-            </p>
+    <main className="min-h-screen bg-slate-950 text-white p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">ATMO Aqua System</h1>
+          <div className={`px-3 py-1 rounded-full text-sm ${status === "ONLINE" ? "bg-green-500" : "bg-red-500"}`}>
+            BACKEND STATUS {status}
           </div>
         </div>
 
-        {/* Quick navigation */}
-        <h2 style={{ marginBottom: "15px" }}>Quick Navigation</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "30px" }}>
-          {[
-            { href: "/executive", title: "Executive Dashboard", desc: "View KPIs, OEE, CIP efficiency, water usage reports" },
-            { href: "/dashboard", title: "Operations Dashboard", desc: "Live sensors, alarms, CIP cycles, trends" },
-            { href: "/trends", title: "Trends & History", desc: "Historical data, charts, export" },
-            { href: "/login", title: "Login / Settings", desc: "User management, system configuration" },
-          ].map((item) => (
-            <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
-              <div style={{ background: "white", padding: "25px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", cursor: "pointer" }}>
-                <h3 style={{ margin: "0 0 8px 0", color: "#0e7490" }}>{item.title}</h3>
-                <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>{item.desc}</p>
-              </div>
-            </Link>
-          ))}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-slate-900 p-4 rounded-xl">
+            <h2 className="text-slate-400">Pump 1</h2>
+            <p className="text-xl">{data?.pump1?.status || "Loading..."}</p>
+            <p>Pressure: {data?.pump1?.pressure || 0} bar</p>
+            <p>Flow: {data?.pump1?.flow || 0} L/min</p>
+          </div>
+          <div className="bg-slate-900 p-4 rounded-xl">
+            <h2 className="text-slate-400">Tank Level</h2>
+            <p className="text-3xl">{data?.tankLevel || 0}%</p>
+          </div>
         </div>
 
-        {/* Payload */}
-        <div style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-          <h3 style={{ marginTop: 0 }}>Backend Response Payload</h3>
-          <pre style={{ background: "#f8fafc", padding: "15px", borderRadius: "8px", overflow: "auto", fontSize: "13px", border: "1px solid #e2e8f0" }}>
-            {health ? JSON.stringify(health, null, 2) : loading ? "Loading JSON..." : "Backend offline - verification system timed out"}
-          </pre>
-          {!backendUp && (
-            <p style={{ color: "#dc2626", fontSize: "14px", marginTop: "10px", fontWeight: "500" }}>
-              {error ? `Error: ${error}` : "Tip: If deployed on Render free tier, server spin up can require up to 60 seconds after periods of inactivity."}
-            </p>
-          )}
+        <div className="mt-6 bg-black p-4 rounded-xl text-xs overflow-auto">
+          <p className="text-slate-400 mb-2">MQTT Topic: 069107032F4002485/# | Last Update: {data?.lastUpdate}</p>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
+          <p className="mt-2 text-green-400">Backend: {BACKEND_URL}</p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
