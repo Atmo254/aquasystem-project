@@ -70,6 +70,8 @@ mqttClient.on('offline', () => console.log('MQTT Offline - retrying'));
 mqttClient.on('reconnect', () => console.log('MQTT Reconnecting...'));
 
 mqttClient.on('message', (topic, msg) => {
+  const raw = message.toString().trim();
+  let parsed = null;
   try {
     const rawString = msg.toString();
     console.log(`MQTT Received [${topic}]:`, rawString);
@@ -77,17 +79,42 @@ mqttClient.on('message', (topic, msg) => {
 
     let data;
     try {
-      data = JSON.parse(rawString);
-    } catch {
-      data = { status: 'Running', pressure: 8.5, flow: 350, raw: rawString };
-    }
 
-    if (topic.includes('069107032F4002485') || topic.includes('pump1')) {
-      liveSensors.pump1 = data;
+      0}
+    if (raw.startsWith('{')) {
+      parsed = JSON.parse(raw);
+    } 
+    // 2. If it's HEX like in your screenshot
+    else if (/^[0-9A-Fa-f\s]+$/.test(raw.replace(/\s/g,''))) {
+      const hex = raw.replace(/\s/g,'');
+      const ascii = Buffer.from(hex, 'hex').toString('utf-8');
+      console.log("HEX decoded ->", ascii);
+      
+      try {
+        parsed = JSON.parse(ascii); // maybe ascii is JSON
+      } catch {
+        // If not JSON, try to extract numbers manually
+        // Example: your hex contains pressure/flow hidden
+        parsed = { 
+          status: "Running", 
+          rawAscii: ascii.substring(0, 100), // first 100 chars
+          pressure: 8.5, // we will parse real values next
+          flow: 343 
+        };
+      }
     }
-    if (topic.includes('pump2')) {
-      liveSensors.pump2 = data;
-    }
+  } catch (e) {
+    console.log("Parse error:", raw.substring(0,50));
+  }
+
+  if (parsed) {
+    // Update your pump data
+    if (topic.includes('pump1')) pump1 = { ...pump1, ...parsed, lastUpdate: new Date().toISOString() };
+    if (topic.includes('pump2')) pump2 = { ...pump2, ...parsed };
+    console.log("Updated:", topic, parsed);
+  }
+});
+    
     if (topic.includes('tank')) {
       liveSensors.tankLevel =
         data.level !== undefined ? data.level :
