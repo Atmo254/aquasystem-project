@@ -23,6 +23,47 @@ app.get('/', (req, res) => res.json({ status: 'online', mqtt: liveSensors.mqttSt
 
 // IMPORTANT: Start web server FIRST for Render
 const PORT = process.env.PORT || 10000;
+const fs = require('fs');
+const path = require('path');
+const SYSTEMS_FILE = path.join(__dirname, 'systems.json');
+
+function readDB(){ return JSON.parse(fs.readFileSync(SYSTEMS_FILE, 'utf8')); }
+function writeDB(data){ fs.writeFileSync(SYSTEMS_FILE, JSON.stringify(data, null, 2)); }
+
+// PUBLIC - frontend fetches its config
+app.get('/api/config/:systemId', (req,res)=>{
+  const db = readDB();
+  const sys = db.systems.find(s=>s.id===req.params.systemId);
+  if(!sys) return res.status(404).json({error:'not found'});
+  res.json(sys);
+});
+
+// LOGIN
+app.post('/api/login', (req,res)=>{
+  const {username,password} = req.body;
+  const db = readDB();
+  const user = db.users.find(u=>u.username===username && u.password===password);
+  if(!user) return res.status(401).json({error:'invalid'});
+  const system = db.systems.find(s=>s.id===user.systemId);
+  res.json({user, system});
+});
+
+// ADMIN - list all
+app.get('/api/admin/all', (req,res)=>{ res.json(readDB()); });
+
+// ADMIN - save system
+app.post('/api/admin/system', (req,res)=>{
+  const db = readDB();
+  const idx = db.systems.findIndex(s=>s.id===req.body.id);
+  if(idx>=0) db.systems[idx]=req.body; else db.systems.push(req.body);
+  writeDB(db); res.json({ok:true});
+});
+
+app.post('/api/admin/user', (req,res)=>{
+  const db = readDB();
+  db.users.push({...req.body, id: Date.now().toString()});
+  writeDB(db); res.json({ok:true});
+});
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`ATMO Backend running on ${PORT}`);
 
