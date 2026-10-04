@@ -1,9 +1,3 @@
-I'll give you a clean rewrite — plus the one change that actually fixes the CORS problem from the Next.js side without touching your backend.
-
-### The real fix: proxy through Next.js (kills CORS)
-CORS only bites because the browser calls a *different origin*. Next.js can proxy the request through your own server so the browser sees a same-origin call. Add this to your **`next.config.js`**:
-
-```js
 /** @type {import('next').NextConfig} */
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "https://atmo-backend-212u.onrender.com";
 
@@ -150,10 +144,3 @@ export default function Home() {
     </div>
   );
 }
-```
-
-### Two things to know
-1. **The proxy is the fix.** With `next.config.js` rewrites in place, the browser calls `/api/backend/` (same origin) and Next.js forwards it to your Render backend server-side — so CORS never applies. Deploy this and the card should flip to **ONLINE**.
-2. **Alternative if you can't use the proxy** (e.g. static export / no Next server): you must add CORS headers on the backend instead — `app.use(cors({ origin: true }))` in Express. The frontend rewrite alone can't bypass CORS; that's a browser security rule, not a code bug.
-
-If you'd rather run this on Base44 instead of Next.js, tell me and I'll port it to React + Vite with `react-router-dom`.
