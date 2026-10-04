@@ -53,11 +53,12 @@ setInterval(() => {
   }
 }, 5000);
 
-const DEVICE_TOPIC = '069107032F4002485/#';
-const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883', {
   clientId: 'atmo-' + Math.random().toString(16).slice(2,8),
   clean: true,
-  reconnectPeriod: 5000
+  reconnectPeriod: 5000,
+  connectTimeout: 4000
+});
 });
 
 mqttClient.on('connect', () => {
