@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 
 // Absolute targeting variable fallback matching your hosting instance configuration
-const BACKEND ="https://onrender.com"
+const BACKEND = "https://onrender.com"
 
 // Explicit type layout definition synchronized to our backend output structures
 type Health = {
