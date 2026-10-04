@@ -7,6 +7,8 @@ const app = express();
 // 1. CORS: allow your real Vercel domain, any *.vercel.app preview, and local dev
 const ALLOWED_ORIGINS = [
   'https://aquasystem-project.vercel.app',
+  'http://atmo.co.ke',
+  'http://www.atmo.co.ke',
   'http://localhost:3000',
   'http://localhost:5173'
 ];
