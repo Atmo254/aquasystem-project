@@ -8,8 +8,8 @@ app.use(express.json());
 
 // Live sensor data
 let liveSensors = {
-  feedpump: { status: 'OFF', pressure: 0, flow: 0 },
-  highpressurepump: { status: 'OFF', pressure: 0, flow: 0 },
+  pump1: { status: 'OFF', pressure: 0, flow: 0 },
+  pump2: { status: 'OFF', pressure: 0, flow: 0 },
   tankLevel: 0,
   cip: { cycle: 'CIP-01', status: 'IDLE' },
   lastUpdate: new Date().toISOString()
@@ -31,7 +31,7 @@ setInterval(() => {
 
 // MQTT - FIXED for Render (WSS port 8084) + YOUR device topic
 const DEVICE_TOPIC = '069107032F4002485/#';
-const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883', {
+const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
   clientId: 'atmo-' + Math.random().toString(16).slice(2, 8),
   clean: true,
   reconnectPeriod: 5000,
@@ -39,7 +39,7 @@ const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883', {
 });
 
 mqttClient.on('connect', () => {
-  console.log('MQTT Connected via TCP');
+  console.log('MQTT Connected via WSS');
   mqttClient.subscribe(['atmo/#', DEVICE_TOPIC], (err) => {
     if (!err) {
       console.log('Subscribed to atmo/# and ' + DEVICE_TOPIC);
@@ -64,13 +64,13 @@ mqttClient.on('message', (topic, msg) => {
       data = { status: 'Running', pressure: 8.5, flow: 350, raw: msg.toString() };
     }
 
-    if (topic.includes('069107032F4002485') || topic.includes('feedpump')) {
-      liveSensors.feedpump = data;
+    if (topic.includes('069107032F4002485') || topic.includes('pump1')) {
+      liveSensors.pump1 = data;
     }
-    if (topic.includes('feedpump')) {
-      liveSensors.feedpump = data;
+    if (topic.includes('pump2')) {
+      liveSensors.pump2 = data;
     }
-    if (topic.includes('feedtank')) {
+    if (topic.includes('tank')) {
       liveSensors.tankLevel = data.level || data.value || data;
     }
     if (topic.includes('cip')) {
