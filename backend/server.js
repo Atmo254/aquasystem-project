@@ -31,7 +31,7 @@ setInterval(() => {
 
 // MQTT - FIXED for Render (WSS port 8084) + YOUR device topic
 const DEVICE_TOPIC = '069107032F4002485/#';
-const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883', {
   clientId: 'atmo-' + Math.random().toString(16).slice(2, 8),
   clean: true,
   reconnectPeriod: 5000,
@@ -39,7 +39,7 @@ const mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
 });
 
 mqttClient.on('connect', () => {
-  console.log('MQTT Connected via WSS');
+  console.log('MQTT Connected via TCP');
   mqttClient.subscribe(['atmo/#', DEVICE_TOPIC], (err) => {
     if (!err) {
       console.log('Subscribed to atmo/# and ' + DEVICE_TOPIC);
